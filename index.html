@@ -1029,11 +1029,19 @@
     if (!currentUser || !db) return;
     const uid = currentUser.uid;
     unsub = db.collection('users').doc(uid).collection('files')
-      .orderBy('createdAt', 'desc')
       .onSnapshot(snap => {
         userFiles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // sort by createdAt descending in JS instead of Firestore
+        userFiles.sort((a, b) => {
+          const ta = a.createdAt ? (a.createdAt.toMillis ? a.createdAt.toMillis() : 0) : 0;
+          const tb = b.createdAt ? (b.createdAt.toMillis ? b.createdAt.toMillis() : 0) : 0;
+          return tb - ta;
+        });
         renderFiles();
         updateStats();
+      }, err => {
+        console.error('Firestore error:', err);
+        showToast('Error loading files: ' + err.message, 'error');
       });
   }
 
