@@ -218,13 +218,13 @@
   const BUCKET_NAME     = 'files'; // storage bucket name
   // ──────────────────────────────────────────────────────
 
-  let supabase, currentUser, userFiles = [], deleteTarget = null;
+  let sbClient, currentUser, userFiles = [], deleteTarget = null;
 
   async function init() {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
     document.getElementById('loading-screen').style.display = 'none';
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await sbClient.auth.getSession();
     if (session) {
       currentUser = session.user;
       showApp();
@@ -233,7 +233,7 @@
       showAuth();
     }
 
-    supabase.auth.onAuthStateChange((event, session) => {
+    sbClient.auth.onAuthStateChange((event, session) => {
       if (session) { currentUser = session.user; showApp(); loadFiles(); }
       else { currentUser = null; showAuth(); }
     });
@@ -266,7 +266,7 @@
     if (!email || !password) { showErr('login-error', 'Fill in all fields.'); return; }
     const btn = document.getElementById('login-btn');
     btn.disabled = true; btn.textContent = 'Signing in…';
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await sbClient.auth.signInWithPassword({ email, password });
     if (error) showErr('login-error', error.message);
     btn.disabled = false; btn.textContent = 'Sign In →';
   }
@@ -280,7 +280,7 @@
     if (password.length < 6) { showErr('reg-error', 'Password must be at least 6 characters.'); return; }
     const btn = document.getElementById('register-btn');
     btn.disabled = true; btn.textContent = 'Creating account…';
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { error } = await sbClient.auth.signUp({ email, password });
     if (error) { showErr('reg-error', error.message); }
     else {
       const info = document.getElementById('reg-info');
@@ -291,7 +291,7 @@
   }
 
   async function doLogout() {
-    await supabase.auth.signOut();
+    await sbClient.auth.signOut();
     userFiles = [];
     renderFiles();
   }
@@ -326,7 +326,7 @@
     }, 200);
 
     const filePath = `${currentUser.id}/${Date.now()}_${file.name}`;
-    const { error: uploadError } = await supabase.storage.from(BUCKET_NAME).upload(filePath, file);
+    const { error: uploadError } = await sbClient.storage.from(BUCKET_NAME).upload(filePath, file);
     clearInterval(ticker);
 
     if (uploadError) {
@@ -338,10 +338,10 @@
     fill.style.width = '100%';
     document.getElementById('progress-pct').textContent = '100%';
 
-    const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
+    const { data: urlData } = sbClient.storage.from(BUCKET_NAME).getPublicUrl(filePath);
 
     // Save metadata to database
-    const { error: dbError } = await supabase.from('files').insert({
+    const { error: dbError } = await sbClient.from('files').insert({
       user_id:    currentUser.id,
       name:       file.name,
       size:       file.size,
@@ -362,7 +362,7 @@
   // ── FILE LIST ─────────────────────────────────────────
   async function loadFiles() {
     if (!currentUser) return;
-    const { data, error } = await supabase
+    const { data, error } = await sbClient
       .from('files')
       .select('*')
       .eq('user_id', currentUser.id)
@@ -418,8 +418,8 @@
   async function confirmDelete() {
     if (!deleteTarget) return;
     closeDeleteModal();
-    await supabase.storage.from(BUCKET_NAME).remove([deleteTarget.path]);
-    await supabase.from('files').delete().eq('id', deleteTarget.id);
+    await sbClient.storage.from(BUCKET_NAME).remove([deleteTarget.path]);
+    await sbClient.from('files').delete().eq('id', deleteTarget.id);
     showToast('File deleted.', 'success');
     loadFiles();
   }
